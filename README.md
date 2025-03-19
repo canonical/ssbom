@@ -9,13 +9,13 @@ The SBOM is generated in the SPDX format using the metadata from the Chisel
 
 To build the project, run the following command:
 ```bash
-go build ./cmd/chisel-sbom
+go build ./cmd/ssbom
 ```
 
 ### Run
 
 ```
-./chisel-sbom /path/to/manifest.wall [/path/to/output.spdx.json]
+./ssbom /path/to/manifest.wall [/path/to/output.spdx.json]
 ```
 
 If there is no output file specified, the SBOM will be generated to a `manifest.spdx.json` file
