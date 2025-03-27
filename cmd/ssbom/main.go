@@ -45,11 +45,6 @@ func run() error {
 			outPath = filepath.Join(cwd, "manifest.spdx.json")
 		}
 	}
-	fileOut, err := os.Create(outPath)
-	if err != nil {
-		return err
-	}
-	defer fileOut.Close()
 
 	fileReader, err := os.Open(filepath.Join(root, manifestPath))
 	if err != nil {
@@ -76,6 +71,12 @@ func run() error {
 	if err != nil {
 		return err
 	}
+
+	fileOut, err = os.Create(outPath)
+	if err != nil {
+		return err
+	}
+	defer fileOut.Close()
 
 	json.Write(doc, fileOut, json.EscapeHTML(false))
 	fmt.Printf("SPDX document created at %v\n", outPath)
