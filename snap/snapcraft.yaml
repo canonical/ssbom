@@ -17,6 +17,15 @@ parts:
     override-build: |
       CGO_ENABLED=0 go build -trimpath -ldflags=-w -ldflags=-s -o $CRAFT_PART_INSTALL/usr/bin/ssbom ./cmd/ssbom
 
+  scripts:
+    plugin: dump
+    source: scripts
+    organize:
+      'ssbom-trivy.sh': usr/bin/ssbom-trivy
+
 apps:
   ssbom:
     command: usr/bin/ssbom
+
+  trivy:
+    command: usr/bin/ssbom-trivy
