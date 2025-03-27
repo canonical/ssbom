@@ -1,5 +1,5 @@
 name: ssbom
-summary: ssbom is a software tool to generate SBOMs for chiselled Ubuntu package slices.
+summary: ssbom is a software tool to generate SBOMs for chiselled Ubuntu rootfs.
 description: |
   ssbom consumes the Chisel JsonWall-formatted manifest and generates a software
   bill of materials (SBOM) in SPDX JSON format.
@@ -7,18 +7,16 @@ source-code: https://github.com/canonical/ssbom
 version: '0.0.1'
 grade: devel
 base: core24
-confinement: strict
+confinement: classic
 
 parts:
   ssbom:
     plugin: go
     build-snaps: [go/latest/stable]
     source: .
-    stage-packages:
-      - git
+    override-build: |
+      CGO_ENABLED=0 go build -trimpath -ldflags=-w -ldflags=-s -o $CRAFT_PART_INSTALL/usr/bin/ssbom ./cmd/ssbom
 
 apps:
   ssbom:
-    command: bin/ssbom
-    plugs: 
-      - home
+    command: usr/bin/ssbom
