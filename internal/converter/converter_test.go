@@ -18,7 +18,6 @@ type ProcessTest struct {
 	packageInfos []builder.PackageInfo
 	pathInfos    []builder.PathInfo
 	sliceInfos   []builder.SliceInfo
-	error        string
 }
 
 var processTests = []ProcessTest{
@@ -40,6 +39,7 @@ var processTests = []ProcessTest{
 				Name:    "test",
 				Version: "1.0",
 				SHA256:  "sha256",
+				Arch:    "amd64",
 			},
 		},
 	}, {
@@ -108,7 +108,7 @@ var converterTests = []ConverterTest{
 			SPDXVersion:    spdx.Version,
 			DataLicense:    spdx.DataLicense,
 			SPDXIdentifier: spdx.ElementID("DOCUMENT"),
-			DocumentName:   "test",
+			DocumentName:   builder.DocumentName,
 			Packages: []*spdx.Package{
 				&testutil.SPDXDocSampleSinglePackage,
 				&testutil.SPDXDocSampleSingleSlice,
@@ -129,7 +129,7 @@ var converterTests = []ConverterTest{
 		summary: "Path with non-empty SHA256 and FinalSHA256 has relationship FILE_MODIFIED",
 		jsonwall: `
 			{"jsonwall":"1.0","schema":"1.0","count":3}
-			{"kind":"package","name":"test","version":"1.0","sha256":"sha256"}
+			{"kind":"package","name":"test","version":"1.0","sha256":"sha256","arch":"all"}
 			{"kind":"path","path":"/test","mode":"0644","slices":["test_slice"],"sha256":"sha256","final_sha256":"final_sha256","size":1024}
 			{"kind":"slice","name":"test_slice"}
 		`,
@@ -137,9 +137,9 @@ var converterTests = []ConverterTest{
 			SPDXVersion:    spdx.Version,
 			DataLicense:    spdx.DataLicense,
 			SPDXIdentifier: spdx.ElementID("DOCUMENT"),
-			DocumentName:   "test",
+			DocumentName:   builder.DocumentName,
 			Packages: []*spdx.Package{
-				&testutil.SPDXDocSampleSinglePackage,
+				&testutil.SPDXDocSampleSinglePackageArchAll,
 				&testutil.SPDXDocSampleSingleSlice,
 			},
 			Files: []*spdx.File{
@@ -169,9 +169,13 @@ func (s *S) TestProcessManifestData(c *C) {
 	}
 }
 
-func (s *S) TestConvert(c *C) {
-	for _, test := range converterTests {
-		c.Logf("Running test: %s", test.summary)
+func runTestConvert(c *C, tests []ConverterTest, distro string) {
+	for _, test := range tests {
+		if distro == "" {
+			c.Logf("Running test without distro: %s", test.summary)
+		} else {
+			c.Logf("Running test with distro: %s: %s", distro, test.summary)
+		}
 		lines := strings.Split(strings.TrimSpace(test.jsonwall), "\n")
 		trimmedLines := make([]string, 0, len(lines))
 		for _, line := range lines {
@@ -179,8 +183,26 @@ func (s *S) TestConvert(c *C) {
 		}
 		test.jsonwall = strings.Join(trimmedLines, "\n")
 		var reader io.Reader = strings.NewReader(test.jsonwall)
-		doc, err := converter.Convert(reader)
+		doc, err := converter.Convert(reader, distro)
 		c.Assert(err, IsNil)
 		c.Assert(doc, DeepEquals, &test.spdxDocument)
 	}
+}
+
+func (s *S) TestConvert(c *C) {
+	runTestConvert(c, converterTests, "")
+
+	// Test with distro
+	for i := range testutil.SPDXDocSamplePackages {
+		testutil.SPDXDocSamplePackages[i].PackageExternalReferences[1].Locator += "&distro=ubuntu-24.04"
+	}
+	for i := range converterTests {
+		converterTests[i].spdxDocument.Packages = append([]*spdx.Package{
+			&testutil.SPDXDocSampleUbuntuNoble,
+		}, converterTests[i].spdxDocument.Packages...)
+		converterTests[i].spdxDocument.Relationships = append([]*spdx.Relationship{
+			&testutil.SPDXRelSampleUbuntuNoble,
+		}, converterTests[i].spdxDocument.Relationships...)
+	}
+	runTestConvert(c, converterTests, "24.04")
 }

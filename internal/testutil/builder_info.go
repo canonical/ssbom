@@ -11,6 +11,7 @@ var SampleSinglePackage = []builder.PackageInfo{
 		Name:    "test",
 		Version: "1.0",
 		SHA256:  "sha256",
+		Arch:    "amd64",
 	},
 }
 
@@ -73,6 +74,51 @@ var SPDXDocSampleSinglePackage = spdx.Package{
 	PackageSPDXIdentifier:   spdx.ElementID("Package-test"),
 	PackageComment:          "This package includes one or more slice(s); see Relationship information.",
 	PackageSupplier:         &builder.UbuntuPackageSupplier,
+	PackageExternalReferences: []*spdx.PackageExternalReference{
+		{
+			Category: "SECURITY",
+			RefType:  "cpe23Type",
+			Locator:  "cpe:2.3:a:test:test:1.0:*:*:*:*:*:*:*",
+		},
+		{
+			Category: "PACKAGE_MANAGER",
+			RefType:  "purl",
+			Locator:  "pkg:deb/ubuntu/test@1.0?arch=amd64",
+		},
+	},
+}
+
+var SPDXDocSampleSinglePackageArchAll = spdx.Package{
+	PackageName:    "test",
+	PackageVersion: "1.0",
+	FilesAnalyzed:  false,
+	PackageChecksums: []spdx.Checksum{
+		{
+			Algorithm: spdx.SHA256,
+			Value:     "sha256",
+		},
+	},
+	PackageDownloadLocation: "NOASSERTION",
+	PackageSPDXIdentifier:   spdx.ElementID("Package-test"),
+	PackageComment:          "This package includes one or more slice(s); see Relationship information.",
+	PackageSupplier:         &builder.UbuntuPackageSupplier,
+	PackageExternalReferences: []*spdx.PackageExternalReference{
+		{
+			Category: "SECURITY",
+			RefType:  "cpe23Type",
+			Locator:  "cpe:2.3:a:test:test:1.0:*:*:*:*:*:*:*",
+		},
+		{
+			Category: "PACKAGE_MANAGER",
+			RefType:  "purl",
+			Locator:  "pkg:deb/ubuntu/test@1.0?arch=all",
+		},
+	},
+}
+
+var SPDXDocSamplePackages = []*spdx.Package{
+	&SPDXDocSampleSinglePackage,
+	&SPDXDocSampleSinglePackageArchAll,
 }
 
 var SPDXDocSampleSingleSlice = spdx.Package{
@@ -159,4 +205,20 @@ var SPDXRelSampleSingleFileModifiedBySlice = spdx.Relationship{
 	RefB:                common.MakeDocElementID("", "Slice-test_slice"),
 	Relationship:        "FILE_MODIFIED",
 	RelationshipComment: "File /test is mutated by the slice test_slice.",
+}
+
+var SPDXDocSampleUbuntuNoble = spdx.Package{
+	PackageName:             "ubuntu",
+	PackageSPDXIdentifier:   "OperatingSystem-ubuntu-24.04",
+	PackageDownloadLocation: "NOASSERTION",
+	FilesAnalyzed:           false,
+	PackageComment:          "This package is the distribution of the rootfs.",
+	PackageVersion:          "24.04",
+	PrimaryPackagePurpose:   "OPERATING_SYSTEM",
+}
+
+var SPDXRelSampleUbuntuNoble = spdx.Relationship{
+	RefA:         common.MakeDocElementID("", "DOCUMENT"),
+	RefB:         common.MakeDocElementID("", "OperatingSystem-ubuntu-24.04"),
+	Relationship: "DESCRIBES",
 }

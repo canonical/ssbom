@@ -1,6 +1,8 @@
 package builder_test
 
 import (
+	"strings"
+
 	"github.com/canonical/ssbom/internal/builder"
 	"github.com/canonical/ssbom/internal/testutil"
 	"github.com/spdx/tools-golang/spdx"
@@ -25,8 +27,10 @@ var builerTests = []BuilderTest{
 			SPDXVersion:    spdx.Version,
 			DataLicense:    spdx.DataLicense,
 			SPDXIdentifier: spdx.ElementID("DOCUMENT"),
-			DocumentName:   "test",
-			Packages:       []*spdx.Package{&testutil.SPDXDocSampleSinglePackage},
+			DocumentName:   builder.DocumentName,
+			Packages: []*spdx.Package{
+				&testutil.SPDXDocSampleSinglePackage,
+			},
 			Relationships: []*spdx.Relationship{
 				{
 					RefA:         common.MakeDocElementID("", "DOCUMENT"),
@@ -46,7 +50,7 @@ var builerTests = []BuilderTest{
 			SPDXVersion:    spdx.Version,
 			DataLicense:    spdx.DataLicense,
 			SPDXIdentifier: spdx.ElementID("DOCUMENT"),
-			DocumentName:   "test",
+			DocumentName:   builder.DocumentName,
 			Packages: []*spdx.Package{
 				&testutil.SPDXDocSampleSinglePackage,
 				&testutil.SPDXDocSampleSingleSlice,
@@ -68,7 +72,7 @@ var builerTests = []BuilderTest{
 			SPDXVersion:    spdx.Version,
 			DataLicense:    spdx.DataLicense,
 			SPDXIdentifier: spdx.ElementID("DOCUMENT"),
-			DocumentName:   "test",
+			DocumentName:   builder.DocumentName,
 			Packages: []*spdx.Package{
 				&testutil.SPDXDocSampleSinglePackage,
 				&testutil.SPDXDocSampleSingleSlice,
@@ -94,7 +98,7 @@ var builerTests = []BuilderTest{
 			SPDXVersion:    spdx.Version,
 			DataLicense:    spdx.DataLicense,
 			SPDXIdentifier: spdx.ElementID("DOCUMENT"),
-			DocumentName:   "test",
+			DocumentName:   builder.DocumentName,
 			Packages: []*spdx.Package{
 				&testutil.SPDXDocSampleSinglePackage,
 				&testutil.SPDXDocSampleSingleSlice,
@@ -126,7 +130,7 @@ var builerTests = []BuilderTest{
 			SPDXVersion:    spdx.Version,
 			DataLicense:    spdx.DataLicense,
 			SPDXIdentifier: spdx.ElementID("DOCUMENT"),
-			DocumentName:   "test",
+			DocumentName:   builder.DocumentName,
 			Packages: []*spdx.Package{
 				&testutil.SPDXDocSampleSinglePackage,
 				&testutil.SPDXDocSampleSingleSlice,
@@ -181,7 +185,7 @@ var builerTests = []BuilderTest{
 			SPDXVersion:    spdx.Version,
 			DataLicense:    spdx.DataLicense,
 			SPDXIdentifier: spdx.ElementID("DOCUMENT"),
-			DocumentName:   "test",
+			DocumentName:   builder.DocumentName,
 			Packages: []*spdx.Package{
 				&testutil.SPDXDocSampleSinglePackage,
 				&testutil.SPDXDocSampleSingleSlice,
@@ -236,7 +240,7 @@ var builerTests = []BuilderTest{
 			SPDXVersion:    spdx.Version,
 			DataLicense:    spdx.DataLicense,
 			SPDXIdentifier: spdx.ElementID("DOCUMENT"),
-			DocumentName:   "test",
+			DocumentName:   builder.DocumentName,
 			Packages: []*spdx.Package{
 				&testutil.SPDXDocSampleSinglePackage,
 				&testutil.SPDXDocSampleSingleSlice,
@@ -262,7 +266,7 @@ var builerTests = []BuilderTest{
 			SPDXVersion:    spdx.Version,
 			DataLicense:    spdx.DataLicense,
 			SPDXIdentifier: spdx.ElementID("DOCUMENT"),
-			DocumentName:   "test",
+			DocumentName:   builder.DocumentName,
 			Packages: []*spdx.Package{
 				&testutil.SPDXDocSampleSinglePackage,
 				&testutil.SPDXDocSampleSingleSlice,
@@ -318,10 +322,14 @@ var builerTests = []BuilderTest{
 	},
 }
 
-func (s *S) TestBuilder(c *C) {
-	for _, test := range builerTests {
-		c.Logf("Running test: %s", test.summary)
-		doc, err := builder.BuildSPDXDocument("test", &test.sliceInfos, &test.packageInfos, &test.pathInfos)
+func runTestBuilder(c *C, test []BuilderTest, distro string) {
+	for _, test := range test {
+		if distro == "" {
+			c.Logf("Running test without distro: %s", test.summary)
+		} else {
+			c.Logf("Running test with distro: %s: %s", distro, test.summary)
+		}
+		doc, err := builder.BuildSPDXDocument(distro, &test.sliceInfos, &test.packageInfos, &test.pathInfos)
 		if test.error != "" {
 			c.Assert(err, ErrorMatches, test.error)
 			continue
@@ -329,4 +337,23 @@ func (s *S) TestBuilder(c *C) {
 		c.Assert(err, IsNil)
 		c.Assert(doc, DeepEquals, &test.spdxDocument)
 	}
+}
+
+func (s *S) TestBuilder(c *C) {
+	runTestBuilder(c, builerTests, "")
+
+	// Testing builder with non-empty distro
+	// The package external reference is not appended with "&distro=ubuntu-24.04" because
+	// the conversion from manifest to packageInfo is done in the converter
+	for i := range builerTests {
+		if !strings.Contains(builerTests[i].summary, "Cannot") {
+			builerTests[i].spdxDocument.Packages = append([]*spdx.Package{
+				&testutil.SPDXDocSampleUbuntuNoble,
+			}, builerTests[i].spdxDocument.Packages...)
+			builerTests[i].spdxDocument.Relationships = append([]*spdx.Relationship{
+				&testutil.SPDXRelSampleUbuntuNoble,
+			}, builerTests[i].spdxDocument.Relationships...)
+		}
+	}
+	runTestBuilder(c, builerTests, "24.04")
 }

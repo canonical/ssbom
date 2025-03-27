@@ -9,11 +9,14 @@ import (
 )
 
 const EmptySHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+const DocumentName = "Chiselled Ubuntu Rootfs"
 
 type PackageInfo struct {
 	Name    string
 	Version string
 	SHA256  string
+	Arch    string
+	Distro  string
 }
 
 type PathInfo struct {
@@ -37,15 +40,33 @@ var ChiselSbomDocCreator = []common.Creator{
 	},
 }
 
-func BuildSPDXDocument(docName string, sliceInfos *[]SliceInfo, packageInfos *[]PackageInfo, pathInfos *[]PathInfo) (*spdx.Document, error) {
+func BuildSPDXDocument(distro string, sliceInfos *[]SliceInfo, packageInfos *[]PackageInfo, pathInfos *[]PathInfo) (*spdx.Document, error) {
 	doc := &spdx.Document{
 		SPDXVersion:    spdx.Version,
 		DataLicense:    spdx.DataLicense,
 		SPDXIdentifier: spdx.ElementID("DOCUMENT"),
-		DocumentName:   docName,
+		DocumentName:   DocumentName,
 		CreationInfo: &spdx.CreationInfo{
 			Creators: ChiselSbomDocCreator,
 		},
+	}
+
+	if distro != "" {
+		osPackage := &spdx.Package{
+			PackageName:             "ubuntu",
+			PackageSPDXIdentifier:   common.ElementID(OSId(distro)),
+			PackageDownloadLocation: "NOASSERTION",
+			FilesAnalyzed:           false,
+			PackageComment:          "This package is the distribution of the rootfs.",
+			PackageVersion:          distro,
+			PrimaryPackagePurpose:   "OPERATING_SYSTEM",
+		}
+		doc.Packages = append(doc.Packages, osPackage)
+		doc.Relationships = append(doc.Relationships, &spdx.Relationship{
+			RefA:         common.MakeDocElementID("", "DOCUMENT"),
+			RefB:         common.MakeDocElementID("", OSId(distro)),
+			Relationship: "DESCRIBES",
+		})
 	}
 
 	// Add packages
@@ -81,6 +102,10 @@ func BuildSPDXDocument(docName string, sliceInfos *[]SliceInfo, packageInfos *[]
 	return doc, nil
 }
 
+func OSId(distro string) string {
+	return fmt.Sprintf("OperatingSystem-ubuntu-%s", distro)
+}
+
 func (p *PackageInfo) SPDXId() string {
 	return fmt.Sprintf("Package-%s", p.Name)
 }
@@ -98,6 +123,18 @@ var UbuntuPackageSupplier = common.Supplier{
 	Supplier:     "Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>",
 }
 
+func (p *PackageInfo) CPE23Locator() string {
+	return fmt.Sprintf("cpe:2.3:a:%s:%s:%s:*:*:*:*:*:*:*", p.Name, p.Name, p.Version)
+}
+
+func (p *PackageInfo) PurlLocator() string {
+	locator := fmt.Sprintf("pkg:deb/ubuntu/%s@%s?arch=%s", p.Name, p.Version, p.Arch)
+	if p.Distro != "" {
+		locator += fmt.Sprintf("&distro=ubuntu-%s", p.Distro)
+	}
+	return locator
+}
+
 func (p *PackageInfo) buildPackageSection() (*spdx.Package, *spdx.Relationship, error) {
 	pkg := &spdx.Package{
 		PackageName:             p.Name,
@@ -108,6 +145,18 @@ func (p *PackageInfo) buildPackageSection() (*spdx.Package, *spdx.Relationship, 
 		FilesAnalyzed:           false,
 		PackageComment:          "This package includes one or more slice(s); see Relationship information.",
 		PackageSupplier:         &UbuntuPackageSupplier,
+		PackageExternalReferences: []*spdx.PackageExternalReference{
+			{
+				Category: "SECURITY",
+				RefType:  "cpe23Type",
+				Locator:  p.CPE23Locator(),
+			},
+			{
+				Category: "PACKAGE_MANAGER",
+				RefType:  "purl",
+				Locator:  p.PurlLocator(),
+			},
+		},
 	}
 
 	rln := &spdx.Relationship{

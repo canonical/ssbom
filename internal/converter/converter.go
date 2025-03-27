@@ -12,13 +12,13 @@ import (
 )
 
 // Convert converts a JSONWall to an SPDX document.
-func Convert(reader io.Reader) (*spdx.Document, error) {
+func Convert(reader io.Reader, distro string) (*spdx.Document, error) {
 	db, err := jsonwall.ReadDB(reader)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read manifest: %s", err)
 	}
 
-	manifestData := &ManifestData{}
+	manifestData := &ManifestData{Distro: distro}
 	for _, fn := range updateFunctions {
 		fn(db, manifestData)
 	}
@@ -27,7 +27,7 @@ func Convert(reader io.Reader) (*spdx.Document, error) {
 	packageInfos := manifestData.ProcessPackages()
 	pathInfos := manifestData.ProcessPaths()
 
-	doc, err := builder.BuildSPDXDocument("test", &sliceInfos, &packageInfos, &pathInfos)
+	doc, err := builder.BuildSPDXDocument(manifestData.Distro, &sliceInfos, &packageInfos, &pathInfos)
 	if err != nil {
 		return nil, err
 	}
@@ -40,6 +40,7 @@ type ManifestData struct {
 	Slices   []manifest.Slice
 	Paths    []manifest.Path
 	Content  []manifest.Content
+	Distro   string
 }
 
 func (md *ManifestData) ProcessSlices() []builder.SliceInfo {
@@ -59,6 +60,8 @@ func (md *ManifestData) ProcessPackages() []builder.PackageInfo {
 		packageInfo.Name = p.Name
 		packageInfo.Version = p.Version
 		packageInfo.SHA256 = p.Digest
+		packageInfo.Arch = p.Arch
+		packageInfo.Distro = md.Distro
 		packageInfos = append(packageInfos, packageInfo)
 	}
 	return packageInfos
