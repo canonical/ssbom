@@ -60,8 +60,8 @@ func run() error {
 	osRelease, err := ReadOSRelease(filepath.Join(root, osReleasePath))
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Println("OS release file not found in the chiselled rootfs.")
-			fmt.Println("The generated SBOM will be incomplete for vulnerability identification.")
+			fmt.Println("Warning: OS release file not found in the chiselled rootfs.")
+			fmt.Println("         The generated SBOM will be incomplete for vulnerability identification.")
 		} else {
 			return err
 		}
