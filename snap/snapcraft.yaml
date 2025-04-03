@@ -19,7 +19,7 @@ parts:
     plugin: dump
     source: scripts
     organize:
-      'ssbom-trivy.sh': bin/ssbom-trivy
+      'trivy-wrapper.sh': bin/trivy-wrapper
 
   trivy:
     plugin: nil
@@ -31,7 +31,7 @@ parts:
        ["s390x"]="s390x"
       )
       trivy_deb_url=$(curl -s \
-        https://api.github.com/repos/aquasecurity/trivy/releases/latest |
+        https://api.github.com/repos/aquasecurity/trivy/releases/tags/v0.61.0 |
         awk "/browser_download_url/ && /Linux/" |
         grep "${ARCH_MAP[$CRAFT_ARCH_BUILD_FOR]}.tar.gz\"" |
         cut -d : -f 2,3 |
@@ -48,7 +48,13 @@ apps:
       - home
 
   trivy:
-    command: bin/ssbom-trivy
+    command: bin/trivy
+    plugs:
+      - home
+      - network
+
+  trivy-wrapper:
+    command: bin/trivy-wrapper
     plugs:
       - home
       - network
