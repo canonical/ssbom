@@ -1,0 +1,60 @@
+name: ssbom
+summary: ssbom is a software tool to generate SBOMs for chiselled Ubuntu rootfs.
+description: |
+  ssbom consumes the Chisel JsonWall-formatted manifest and generates a software
+  bill of materials (SBOM) in SPDX JSON format.
+source-code: https://github.com/canonical/ssbom
+version: '0.0.1'
+grade: devel
+base: core24
+confinement: strict
+
+parts:
+  ssbom:
+    plugin: go
+    build-snaps: [go/latest/stable]
+    source: .
+
+  scripts:
+    plugin: dump
+    source: scripts
+    organize:
+      'trivy-wrapper.sh': bin/trivy-wrapper
+
+  trivy:
+    plugin: nil
+    override-build: |
+      declare -A ARCH_MAP=(
+       ["arm64"]="ARM64"
+       ["amd64"]="64bit"
+       ["ppc64el"]="PPC64LE"
+       ["s390x"]="s390x"
+      )
+      trivy_deb_url=$(curl -s \
+        https://api.github.com/repos/aquasecurity/trivy/releases/tags/v0.61.0 |
+        awk "/browser_download_url/ && /Linux/" |
+        grep "${ARCH_MAP[$CRAFT_ARCH_BUILD_FOR]}.tar.gz\"" |
+        cut -d : -f 2,3 |
+        tr -d ' "')
+      curl -L -o trivy.tar.gz $trivy_deb_url
+      tar -xf trivy.tar.gz trivy
+      mkdir -p $CRAFT_PART_INSTALL/bin
+      mv trivy $CRAFT_PART_INSTALL/bin/trivy
+
+apps:
+  ssbom:
+    command: bin/ssbom
+    plugs:
+      - home
+
+  trivy:
+    command: bin/trivy
+    plugs:
+      - home
+      - network
+
+  trivy-wrapper:
+    command: bin/trivy-wrapper
+    plugs:
+      - home
+      - network
