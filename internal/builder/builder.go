@@ -1,15 +1,19 @@
 package builder
 
 import (
+	"crypto/md5"
 	"fmt"
+	"regexp"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/spdx/tools-golang/spdx"
 	"github.com/spdx/tools-golang/spdx/v2/common"
 )
 
+const EmptySHA1 = "da39a3ee5e6b4b0d3255bfef95601890afd80709"
 const EmptySHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-const DocumentName = "Chiselled Ubuntu Rootfs"
 
 type PackageInfo struct {
 	Name    string
@@ -40,15 +44,25 @@ var ChiselSbomDocCreator = []common.Creator{
 	},
 }
 
-func BuildSPDXDocument(distro string, sliceInfos *[]SliceInfo, packageInfos *[]PackageInfo, pathInfos *[]PathInfo) (*spdx.Document, error) {
+func BuildSPDXDocument(name, distro string, sliceInfos *[]SliceInfo, packageInfos *[]PackageInfo, pathInfos *[]PathInfo) (*spdx.Document, error) {
+	normalizedName := regexp.MustCompile(`(\s|#)+`).ReplaceAllString(strings.TrimSpace(name), "-")
+	randomUuid, err := uuid.NewUUID()
+	if err != nil {
+		return nil, err
+	}
+
+	docNameSpace := "https://sbom.canonical.com/spdxdocs/" + normalizedName + "-" + randomUuid.String()
+
 	doc := &spdx.Document{
 		SPDXVersion:    spdx.Version,
 		DataLicense:    spdx.DataLicense,
 		SPDXIdentifier: spdx.ElementID("DOCUMENT"),
-		DocumentName:   DocumentName,
+		DocumentName:   name,
 		CreationInfo: &spdx.CreationInfo{
 			Creators: ChiselSbomDocCreator,
+			Created:  time.Now().UTC().Format(time.RFC3339),
 		},
+		DocumentNamespace: docNameSpace,
 	}
 
 	if distro != "" {
@@ -102,29 +116,31 @@ func BuildSPDXDocument(distro string, sliceInfos *[]SliceInfo, packageInfos *[]P
 	return doc, nil
 }
 
+func getMD5Hash(s string) string {
+	h := md5.New()
+	h.Write([]byte(s))
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
 func OSId(distro string) string {
-	return fmt.Sprintf("OperatingSystem-ubuntu-%s", distro)
+	return fmt.Sprintf("OperatingSystem-ubuntu-%s", getMD5Hash(distro))
 }
 
 func (p *PackageInfo) SPDXId() string {
-	return fmt.Sprintf("Package-%s", p.Name)
+	return fmt.Sprintf("Package-%s", getMD5Hash(p.Name))
 }
 
 func (s *SliceInfo) SPDXId() string {
-	return fmt.Sprintf("Slice-%s", s.Name)
+	return fmt.Sprintf("Slice-%s", getMD5Hash(s.Name))
 }
 
 func (p *PathInfo) SPDXId() string {
-	return fmt.Sprintf("File-%s", p.Path)
+	return fmt.Sprintf("File-%s", getMD5Hash(p.Path))
 }
 
 var UbuntuPackageSupplier = common.Supplier{
 	SupplierType: "Person",
 	Supplier:     "Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>",
-}
-
-func (p *PackageInfo) CPE23Locator() string {
-	return fmt.Sprintf("cpe:2.3:a:%s:%s:%s:*:*:*:*:*:*:*", p.Name, p.Name, p.Version)
 }
 
 func (p *PackageInfo) PurlLocator() string {
@@ -146,11 +162,6 @@ func (p *PackageInfo) buildPackageSection() (*spdx.Package, *spdx.Relationship, 
 		PackageComment:          "This package includes one or more slice(s); see Relationship information.",
 		PackageSupplier:         &UbuntuPackageSupplier,
 		PackageExternalReferences: []*spdx.PackageExternalReference{
-			{
-				Category: "SECURITY",
-				RefType:  "cpe23Type",
-				Locator:  p.CPE23Locator(),
-			},
 			{
 				Category: "PACKAGE_MANAGER",
 				RefType:  "purl",
@@ -175,7 +186,7 @@ func (s *SliceInfo) buildSliceSection() (*spdx.Package, *spdx.Relationship, erro
 		PackageName:             s.Name,
 		PackageSPDXIdentifier:   common.ElementID(s.SPDXId()),
 		PackageDownloadLocation: "NOASSERTION",
-		FilesAnalyzed:           false,
+		FilesAnalyzed:           true,
 		PackageComment:          fmt.Sprintf("This slice is a sub-package of the package %s; see Relationship information.", packageName),
 	}
 
@@ -211,9 +222,12 @@ func (f *PathInfo) buildPathSection() (*spdx.File, []*spdx.Relationship, error) 
 	if f.FinalSHA256 != "" {
 		sha256 = f.FinalSHA256
 	}
+	if sha256 == "" {
+		sha256 = EmptySHA256
+	}
 	var fileType int
 	file := &spdx.File{
-		FileName:           f.Path,
+		FileName:           strings.TrimLeft(f.Path, "/"),
 		FileSPDXIdentifier: common.ElementID(f.SPDXId()),
 		Checksums:          []common.Checksum{{Algorithm: common.SHA256, Value: sha256}},
 		FileCopyrightText:  "NOASSERTION",

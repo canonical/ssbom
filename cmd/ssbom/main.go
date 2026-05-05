@@ -57,7 +57,7 @@ func run() error {
 	}
 	defer zstdReader.Close()
 
-	osRelease, err := ReadOSRelease(filepath.Join(root, osReleasePath))
+	osId, versionId, err := ReadOSRelease(filepath.Join(root, osReleasePath))
 	if err != nil {
 		if os.IsNotExist(err) {
 			fmt.Println("Warning: OS release file not found in the chiselled rootfs.")
@@ -67,7 +67,7 @@ func run() error {
 		}
 	}
 
-	doc, err := converter.Convert(zstdReader, osRelease)
+	doc, err := converter.Convert(zstdReader, osId, versionId)
 	if err != nil {
 		return err
 	}
@@ -83,13 +83,18 @@ func run() error {
 	return nil
 }
 
-func ReadOSRelease(configfile string) (string, error) {
+func ReadOSRelease(configfile string) (string, string, error) {
 	cfg, err := ini.Load(configfile)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	versionId := cfg.Section("").Key("VERSION_ID").String()
+	osId := cfg.Section("").Key("ID").String()
 
-	return versionId, nil
+	if versionId == "" || osId == "" {
+		return "", "", fmt.Errorf("invalid os-release file: missing ID or VERSION_ID")
+	}
+
+	return osId, versionId, nil
 }
