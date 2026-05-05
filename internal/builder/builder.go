@@ -14,7 +14,6 @@ import (
 
 const EmptySHA1 = "da39a3ee5e6b4b0d3255bfef95601890afd80709"
 const EmptySHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-const DocumentName = "Chiselled Ubuntu Rootfs"
 
 type PackageInfo struct {
 	Name    string
@@ -45,8 +44,8 @@ var ChiselSbomDocCreator = []common.Creator{
 	},
 }
 
-func BuildSPDXDocument(distro string, sliceInfos *[]SliceInfo, packageInfos *[]PackageInfo, pathInfos *[]PathInfo) (*spdx.Document, error) {
-	normalizedName := regexp.MustCompile(`(\s|#)+`).ReplaceAllString(strings.TrimSpace(DocumentName), "-")
+func BuildSPDXDocument(name, distro string, sliceInfos *[]SliceInfo, packageInfos *[]PackageInfo, pathInfos *[]PathInfo) (*spdx.Document, error) {
+	normalizedName := regexp.MustCompile(`(\s|#)+`).ReplaceAllString(strings.TrimSpace(name), "-")
 	randomUuid, err := uuid.NewUUID()
 	if err != nil {
 		return nil, err
@@ -58,7 +57,7 @@ func BuildSPDXDocument(distro string, sliceInfos *[]SliceInfo, packageInfos *[]P
 		SPDXVersion:    spdx.Version,
 		DataLicense:    spdx.DataLicense,
 		SPDXIdentifier: spdx.ElementID("DOCUMENT"),
-		DocumentName:   DocumentName,
+		DocumentName:   name,
 		CreationInfo: &spdx.CreationInfo{
 			Creators: ChiselSbomDocCreator,
 			Created:  time.Now().UTC().Format(time.RFC3339),
