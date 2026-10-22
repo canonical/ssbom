@@ -50,13 +50,13 @@ This tools also provides a script to run [`trivy`](https://github.com/aquasecuri
 If installed with `go install`:
 
 ```bash
-./scripts/ssbom-trivy <path-to-chiselled-rootfs> [<extra-trivy-args>]
+./scripts/trivy-wrapper.sh <path-to-chiselled-rootfs> [<extra-trivy-args>]
 ```
 
 If installed with snap:
 
 ```bash
-ssbom.trivy <path-to-chiselled-rootfs> [<extra-trivy-args>]
+ssbom.trivy-wrapper <path-to-chiselled-rootfs> [<extra-trivy-args>]
 ```
 
 ### Test
