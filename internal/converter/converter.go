@@ -1,18 +1,22 @@
 package converter
 
 import (
+	"crypto/sha1"
+	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/fs"
 	"strings"
 
 	"github.com/canonical/chisel/public/jsonwall"
 	"github.com/canonical/chisel/public/manifest"
 	"github.com/canonical/ssbom/internal/builder"
 	"github.com/spdx/tools-golang/spdx"
+	"github.com/spdx/tools-golang/spdx/v2/common"
 )
 
-// Convert converts a JSONWall to an SPDX document.
-func Convert(reader io.Reader, name string, distro string) (*spdx.Document, error) {
+// Convert converts a JSONWall and its root filesystem to an SPDX document.
+func Convert(reader io.Reader, root fs.FS, name, distro string) (*spdx.Document, error) {
 	db, err := jsonwall.ReadDB(reader)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read manifest: %s", err)
@@ -26,6 +30,14 @@ func Convert(reader io.Reader, name string, distro string) (*spdx.Document, erro
 	sliceInfos := manifestData.ProcessSlices()
 	packageInfos := manifestData.ProcessPackages()
 	pathInfos := manifestData.ProcessPaths()
+	for i := range pathInfos {
+		path := &pathInfos[i]
+		checksums, err := fileChecksums(root, strings.TrimPrefix(path.Path, "/"))
+		if err != nil {
+			return nil, fmt.Errorf("cannot checksum %s: %w", path.Path, err)
+		}
+		path.Checksums = checksums
+	}
 
 	doc, err := builder.BuildSPDXDocument(name, distro, &sliceInfos, &packageInfos, &pathInfos)
 	if err != nil {
@@ -33,6 +45,44 @@ func Convert(reader io.Reader, name string, distro string) (*spdx.Document, erro
 	}
 
 	return doc, nil
+}
+
+func fileChecksums(root fs.FS, path string) ([]common.Checksum, error) {
+	info, err := fs.Lstat(root, path)
+	if err != nil {
+		return nil, err
+	}
+
+	sha1Hash := sha1.New()
+	sha256Hash := sha256.New()
+	hashes := io.MultiWriter(sha1Hash, sha256Hash)
+	switch {
+	case info.Mode()&fs.ModeSymlink != 0:
+		// A symlink stores its target path, which may be dangling or outside the root.
+		target, err := fs.ReadLink(root, path)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := io.WriteString(hashes, target); err != nil {
+			return nil, err
+		}
+	case info.Mode().IsRegular():
+		file, err := root.Open(path)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+		if _, err := io.Copy(hashes, file); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unsupported file type %s", info.Mode().Type())
+	}
+
+	return []common.Checksum{
+		{Algorithm: common.SHA1, Value: fmt.Sprintf("%x", sha1Hash.Sum(nil))},
+		{Algorithm: common.SHA256, Value: fmt.Sprintf("%x", sha256Hash.Sum(nil))},
+	}, nil
 }
 
 type ManifestData struct {
@@ -77,7 +127,6 @@ func (md *ManifestData) ProcessPaths() []builder.PathInfo {
 		pathInfo.Path = p.Path
 		pathInfo.Mode = p.Mode
 		pathInfo.Slices = p.Slices
-		pathInfo.SHA256 = p.SHA256
 		pathInfo.FinalSHA256 = p.FinalSHA256
 		pathInfo.Link = p.Link
 		pathInfo.Inode = p.Inode

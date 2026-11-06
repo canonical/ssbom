@@ -12,8 +12,7 @@ import (
 	"github.com/spdx/tools-golang/spdx/v2/common"
 )
 
-const EmptySHA1 = "da39a3ee5e6b4b0d3255bfef95601890afd80709"
-const EmptySHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+const DocumentName = "Chiselled Ubuntu Rootfs"
 
 type PackageInfo struct {
 	Name    string
@@ -27,7 +26,7 @@ type PathInfo struct {
 	Path        string
 	Mode        string
 	Slices      []string
-	SHA256      string
+	Checksums   []common.Checksum
 	FinalSHA256 string
 	Link        string
 	Inode       uint64
@@ -45,8 +44,11 @@ var ChiselSbomDocCreator = []common.Creator{
 }
 
 func BuildSPDXDocument(name, distro string, sliceInfos *[]SliceInfo, packageInfos *[]PackageInfo, pathInfos *[]PathInfo) (*spdx.Document, error) {
+	if strings.TrimSpace(name) == "" {
+		name = DocumentName
+	}
 	normalizedName := regexp.MustCompile(`(\s|#)+`).ReplaceAllString(strings.TrimSpace(name), "-")
-	randomUuid, err := uuid.NewUUID()
+	randomUuid, err := uuid.NewRandom()
 	if err != nil {
 		return nil, err
 	}
@@ -218,18 +220,11 @@ var fileComments = map[int]string{
 
 func (f *PathInfo) buildPathSection() (*spdx.File, []*spdx.Relationship, error) {
 	var rln []*spdx.Relationship
-	sha256 := f.SHA256
-	if f.FinalSHA256 != "" {
-		sha256 = f.FinalSHA256
-	}
-	if sha256 == "" {
-		sha256 = EmptySHA256
-	}
 	var fileType int
 	file := &spdx.File{
 		FileName:           strings.TrimLeft(f.Path, "/"),
 		FileSPDXIdentifier: common.ElementID(f.SPDXId()),
-		Checksums:          []common.Checksum{{Algorithm: common.SHA256, Value: sha256}},
+		Checksums:          f.Checksums,
 		FileCopyrightText:  "NOASSERTION",
 	}
 

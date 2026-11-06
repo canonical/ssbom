@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Test
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-version: stable
+      - name: Test
+        run: go test ./...
+
+  build:
+    runs-on: ubuntu-latest
+    name: Snap build
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - uses: canonical/craft-actions/snapcraft/pack@acd2f2e61c7563b38ba89390ca0e910fa7d2784f # v0.1.1
+        id: snapcraft
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: snap
+          path: ${{ steps.snapcraft.outputs.snap }}
+          if-no-files-found: error

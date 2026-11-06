@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -46,7 +47,14 @@ func run() error {
 		}
 	}
 
-	fileReader, err := os.Open(filepath.Join(root, manifestPath))
+	rootDir, err := os.OpenRoot(root)
+	if err != nil {
+		return err
+	}
+	defer rootDir.Close()
+
+	rootFS := rootDir.FS()
+	fileReader, err := rootFS.Open(manifestPath)
 	if err != nil {
 		return err
 	}
@@ -57,7 +65,7 @@ func run() error {
 	}
 	defer zstdReader.Close()
 
-	osId, versionId, err := ReadOSRelease(filepath.Join(root, osReleasePath))
+	osId, versionId, err := ReadOSRelease(rootFS)
 	if err != nil {
 		if os.IsNotExist(err) {
 			fmt.Println("Warning: OS release file not found in the chiselled rootfs.")
@@ -67,7 +75,7 @@ func run() error {
 		}
 	}
 
-	doc, err := converter.Convert(zstdReader, osId, versionId)
+	doc, err := converter.Convert(zstdReader, rootFS, osId, versionId)
 	if err != nil {
 		return err
 	}
@@ -83,18 +91,18 @@ func run() error {
 	return nil
 }
 
-func ReadOSRelease(configfile string) (string, string, error) {
-	cfg, err := ini.Load(configfile)
+func ReadOSRelease(root fs.FS) (string, string, error) {
+	data, err := fs.ReadFile(root, osReleasePath)
+	if err != nil {
+		return "", "", err
+	}
+	cfg, err := ini.Load(data)
 	if err != nil {
 		return "", "", err
 	}
 
 	versionId := cfg.Section("").Key("VERSION_ID").String()
 	osId := cfg.Section("").Key("ID").String()
-
-	if versionId == "" || osId == "" {
-		return "", "", fmt.Errorf("invalid os-release file: missing ID or VERSION_ID")
-	}
 
 	return osId, versionId, nil
 }

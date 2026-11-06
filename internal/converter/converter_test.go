@@ -1,8 +1,10 @@
 package converter_test
 
 import (
-	"io"
+	"errors"
+	"io/fs"
 	"strings"
+	"testing/fstest"
 
 	"github.com/canonical/chisel/public/manifest"
 	"github.com/canonical/ssbom/internal/builder"
@@ -64,7 +66,6 @@ var processTests = []ProcessTest{
 				Path:        "/test",
 				Mode:        "0644",
 				Slices:      []string{"test"},
-				SHA256:      "sha256",
 				FinalSHA256: "final_sha256",
 				Link:        "/file",
 				Inode:       1,
@@ -91,13 +92,15 @@ var processTests = []ProcessTest{
 type ConverterTest struct {
 	summary      string
 	jsonwall     string
+	fileContent  string
 	spdxDocument spdx.Document
 	error        string
 }
 
 var converterTests = []ConverterTest{
 	{
-		summary: "Converts manifest data to SPDX document",
+		summary:     "Converts manifest data to SPDX document",
+		fileContent: "original\n",
 		jsonwall: `
 			{"jsonwall":"1.0","schema":"1.0","count":3}
 			{"kind":"package","name":"test","version":"1.0","sha256":"sha256","arch":"amd64"}
@@ -126,7 +129,8 @@ var converterTests = []ConverterTest{
 			},
 		},
 	}, {
-		summary: "Path with non-empty SHA256 and FinalSHA256 has relationship FILE_MODIFIED",
+		summary:     "Path with non-empty SHA256 and FinalSHA256 has relationship FILE_MODIFIED",
+		fileContent: "modified\n",
 		jsonwall: `
 			{"jsonwall":"1.0","schema":"1.0","count":3}
 			{"kind":"package","name":"test","version":"1.0","sha256":"sha256","arch":"all"}
@@ -182,10 +186,10 @@ func runTestConvert(c *C, tests []ConverterTest, distro string) {
 			trimmedLines = append(trimmedLines, strings.TrimLeft(line, "\t"))
 		}
 		test.jsonwall = strings.Join(trimmedLines, "\n")
-		var reader io.Reader = strings.NewReader(test.jsonwall)
-		doc, err := converter.Convert(reader, distro)
+		root := fstest.MapFS{"test": {Data: []byte(test.fileContent)}}
+		doc, err := converter.Convert(strings.NewReader(test.jsonwall), root, "", distro)
 		c.Assert(err, IsNil)
-		c.Assert(doc, DeepEquals, &test.spdxDocument)
+		testutil.AssertDocument(c, doc, test.spdxDocument)
 	}
 }
 
@@ -194,7 +198,7 @@ func (s *S) TestConvert(c *C) {
 
 	// Test with distro
 	for i := range testutil.SPDXDocSamplePackages {
-		testutil.SPDXDocSamplePackages[i].PackageExternalReferences[1].Locator += "&distro=ubuntu-24.04"
+		testutil.SPDXDocSamplePackages[i].PackageExternalReferences[0].Locator += "&distro=ubuntu-24.04"
 	}
 	for i := range converterTests {
 		converterTests[i].spdxDocument.Packages = append([]*spdx.Package{
@@ -205,4 +209,19 @@ func (s *S) TestConvert(c *C) {
 		}, converterTests[i].spdxDocument.Relationships...)
 	}
 	runTestConvert(c, converterTests, "24.04")
+}
+
+func (s *S) TestSymlinkChecksum(c *C) {
+	const wall = `{"jsonwall":"1.0","schema":"1.0","count":1}
+{"kind":"path","path":"/test","mode":"0777","link":"/file"}
+`
+	root := fstest.MapFS{"test": {Mode: fs.ModeSymlink, Data: []byte("/file")}}
+	doc, err := converter.Convert(strings.NewReader(wall), root, "ubuntu", "")
+	c.Assert(err, IsNil)
+	c.Assert(doc.DocumentName, Equals, "ubuntu")
+	c.Assert(doc.Files, HasLen, 1)
+	c.Check(doc.Files[0].Checksums, DeepEquals, testutil.SampleSymlinkChecksums)
+
+	_, err = converter.Convert(strings.NewReader(wall), fstest.MapFS{}, "ubuntu", "")
+	c.Check(errors.Is(err, fs.ErrNotExist), Equals, true)
 }
