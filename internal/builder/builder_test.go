@@ -34,7 +34,7 @@ var builerTests = []BuilderTest{
 			Relationships: []*spdx.Relationship{
 				{
 					RefA:         common.MakeDocElementID("", "DOCUMENT"),
-					RefB:         common.MakeDocElementID("", "Package-test"),
+					RefB:         common.MakeDocElementID("", testutil.SamplePackageID),
 					Relationship: "DESCRIBES",
 				},
 			},
@@ -121,10 +121,10 @@ var builerTests = []BuilderTest{
 		sliceInfos:   testutil.SampleSingleSlice,
 		pathInfos: append(testutil.SampleSinglePathModified,
 			builder.PathInfo{
-				Path:   "/test2",
-				Mode:   "0644",
-				SHA256: "sha256",
-				Slices: []string{"test_slice"},
+				Path:      "/test2",
+				Mode:      "0644",
+				Checksums: testutil.SampleFileChecksums,
+				Slices:    []string{"test_slice"},
 			}),
 		spdxDocument: spdx.Document{
 			SPDXVersion:    spdx.Version,
@@ -138,16 +138,11 @@ var builerTests = []BuilderTest{
 			Files: []*spdx.File{
 				&testutil.SPDXDocSampleSingleFileModified,
 				{
-					FileName:           "/test2",
-					FileSPDXIdentifier: spdx.ElementID("File-/test2"),
-					Checksums: []spdx.Checksum{
-						{
-							Algorithm: spdx.SHA256,
-							Value:     "sha256",
-						},
-					},
-					FileCopyrightText: "NOASSERTION",
-					FileComment:       "This file is included in the slice(s) test_slice; see Relationship information.",
+					FileName:           "test2",
+					FileSPDXIdentifier: "File-bdbc5e82b59e2d430975cdd123931580",
+					Checksums:          testutil.SampleFileChecksums,
+					FileCopyrightText:  "NOASSERTION",
+					FileComment:        "This file is included in the slice(s) test_slice; see Relationship information.",
 				},
 			},
 			Relationships: []*spdx.Relationship{
@@ -155,8 +150,8 @@ var builerTests = []BuilderTest{
 				&testutil.SPDXRelSampleSinglePkgContainsSlice,
 				&testutil.SPDXRelSampleSingleFileModifiedBySlice,
 				{
-					RefA:                common.MakeDocElementID("", "Slice-test_slice"),
-					RefB:                common.MakeDocElementID("", "File-/test2"),
+					RefA:                common.MakeDocElementID("", testutil.SampleSliceID),
+					RefB:                common.MakeDocElementID("", "File-bdbc5e82b59e2d430975cdd123931580"),
 					Relationship:        "CONTAINS",
 					RelationshipComment: "File /test2 is included in the slice test_slice.",
 				},
@@ -175,10 +170,10 @@ var builerTests = []BuilderTest{
 		),
 		pathInfos: []builder.PathInfo{
 			{
-				Path:   "/test",
-				Mode:   "0644",
-				SHA256: "sha256",
-				Slices: []string{"test_slice", "test_slice2"},
+				Path:      "/test",
+				Mode:      "0644",
+				Checksums: testutil.SampleFileChecksums,
+				Slices:    []string{"test_slice", "test_slice2"},
 			},
 		},
 		spdxDocument: spdx.Document{
@@ -191,38 +186,33 @@ var builerTests = []BuilderTest{
 				&testutil.SPDXDocSampleSingleSlice,
 				{
 					PackageName:             "test_slice2",
-					PackageSPDXIdentifier:   spdx.ElementID("Slice-test_slice2"),
-					FilesAnalyzed:           false,
+					PackageSPDXIdentifier:   "Slice-14caad6701f5a02d58aaefe6ebf616f0",
+					FilesAnalyzed:           true,
 					PackageDownloadLocation: "NOASSERTION",
 					PackageComment:          "This slice is a sub-package of the package test; see Relationship information.",
 				},
 			},
 			Files: []*spdx.File{
 				{
-					FileName:           "/test",
-					FileSPDXIdentifier: spdx.ElementID("File-/test"),
-					Checksums: []spdx.Checksum{
-						{
-							Algorithm: spdx.SHA256,
-							Value:     "sha256",
-						},
-					},
-					FileCopyrightText: "NOASSERTION",
-					FileComment:       "This file is included in the slice(s) test_slice, test_slice2; see Relationship information.",
+					FileName:           "test",
+					FileSPDXIdentifier: testutil.SampleFileID,
+					Checksums:          testutil.SampleFileChecksums,
+					FileCopyrightText:  "NOASSERTION",
+					FileComment:        "This file is included in the slice(s) test_slice, test_slice2; see Relationship information.",
 				},
 			},
 			Relationships: []*spdx.Relationship{
 				&testutil.SPDXRelSampleSingleDocDescribesPkg,
 				&testutil.SPDXRelSampleSinglePkgContainsSlice,
 				{
-					RefA:         common.MakeDocElementID("", "Package-test"),
-					RefB:         common.MakeDocElementID("", "Slice-test_slice2"),
+					RefA:         common.MakeDocElementID("", testutil.SamplePackageID),
+					RefB:         common.MakeDocElementID("", "Slice-14caad6701f5a02d58aaefe6ebf616f0"),
 					Relationship: "CONTAINS",
 				},
 				&testutil.SPDXRelSampleSingleSliceContainsFile,
 				{
-					RefA:                common.MakeDocElementID("", "Slice-test_slice2"),
-					RefB:                common.MakeDocElementID("", "File-/test"),
+					RefA:                common.MakeDocElementID("", "Slice-14caad6701f5a02d58aaefe6ebf616f0"),
+					RefB:                common.MakeDocElementID("", testutil.SampleFileID),
 					Relationship:        "CONTAINS",
 					RelationshipComment: "File /test is included in the slice test_slice2.",
 				},
@@ -289,7 +279,6 @@ var builerTests = []BuilderTest{
 			{
 				Path:        "/test",
 				Mode:        "0644",
-				SHA256:      "sha256",
 				FinalSHA256: "final_sha256",
 				Link:        "/file",
 			},
@@ -301,7 +290,6 @@ var builerTests = []BuilderTest{
 			{
 				Path:        "/test",
 				Mode:        "0644",
-				SHA256:      "sha256",
 				FinalSHA256: "final_sha256",
 				Inode:       1,
 			},
@@ -311,11 +299,10 @@ var builerTests = []BuilderTest{
 		summary: "Cannot build doc for invalid link",
 		pathInfos: []builder.PathInfo{
 			{
-				Path:   "/test",
-				Mode:   "0644",
-				SHA256: "sha256",
-				Link:   "/file",
-				Inode:  1,
+				Path:  "/test",
+				Mode:  "0644",
+				Link:  "/file",
+				Inode: 1,
 			},
 		},
 		error: "cannot build file section: invalid file type: file /test simultaneously has inode 1 and link /file",
@@ -329,13 +316,13 @@ func runTestBuilder(c *C, test []BuilderTest, distro string) {
 		} else {
 			c.Logf("Running test with distro: %s: %s", distro, test.summary)
 		}
-		doc, err := builder.BuildSPDXDocument(distro, &test.sliceInfos, &test.packageInfos, &test.pathInfos)
+		doc, err := builder.BuildSPDXDocument("", distro, &test.sliceInfos, &test.packageInfos, &test.pathInfos)
 		if test.error != "" {
 			c.Assert(err, ErrorMatches, test.error)
 			continue
 		}
 		c.Assert(err, IsNil)
-		c.Assert(doc, DeepEquals, &test.spdxDocument)
+		testutil.AssertDocument(c, doc, test.spdxDocument)
 	}
 }
 
